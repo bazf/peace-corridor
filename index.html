@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Алея миру — Квест із QR-підказками</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Pico.css (акуратна стилізація без збірки) -->
+    <link rel="stylesheet" href="https://unpkg.com/@picocss/pico@latest/css/pico.min.css">
+
+    <!-- html5-qrcode (сканер QR) -->
+    <script src="https://unpkg.com/html5-qrcode@latest/html5-qrcode.min.js"></script>
+
+    <style>
+        :root {
+            --ok: #17a34a;
+            /* зелений бейдж */
+            --muted: #94a3b8;
+            /* сірий бейдж */
+            --warn: #d97706;
+            /* помаранчевий */
+            --err: #dc2626;
+            /* червоний */
+        }
+
+        header h1 {
+            margin-bottom: .25rem;
+        }
+
+        .subtle {
+            color: var(--muted);
+            font-size: .95rem;
+        }
+
+        .card {
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 1rem 1.25rem;
+            background: #fff;
+            box-shadow: 0 1px 0 rgba(0, 0, 0, .02);
+        }
+
+        #qr-reader {
+            width: 100%;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        #controls {
+            display: flex;
+            gap: .5rem;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        #hintPanel {
+            display: none;
+        }
+
+        #hintFrame {
+            width: 100%;
+            height: 360px;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            background: #f8fafc;
+        }
+
+        .badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: .5rem;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 2rem;
+            height: 2rem;
+            padding: 0 .5rem;
+            border-radius: 999px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            background: #f1f5f9;
+            color: #0f172a;
+            border: 1px solid #e2e8f0;
+            user-select: none;
+        }
+
+        .badge.ok {
+            background: #ecfdf5;
+            color: #065f46;
+            border-color: #bbf7d0;
+        }
+
+        .badge.next {
+            background: #fff7ed;
+            color: #7c2d12;
+            border-color: #fed7aa;
+        }
+
+        .badge.muted {
+            background: #f8fafc;
+            color: #475569;
+        }
+
+        #msg {
+            margin: .5rem 0 0 0;
+            min-height: 1.25rem;
+        }
+
+        .msg-ok {
+            color: var(--ok);
+        }
+
+        .msg-warn {
+            color: var(--warn);
+        }
+
+        .msg-err {
+            color: var(--err);
+        }
+
+        .muted-text {
+            color: #64748b;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        @media (min-width: 900px) {
+            .grid-2 {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        footer {
+            margin-top: 2rem;
+        }
+
+        .small {
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+
+<body>
+    <main class="container">
+        <header>
+            <h1>Алея миру</h1>
+            <p class="subtle">Проскануй QR під зображенням → натисни “Отримати підказку” → рушай до наступної зупинки. У
+                кожного — свій маршрут.</p>
+        </header>
+
+        <div class="grid-2">
+            <!-- Ліва колонка: Сканер + керування -->
+            <section class="card">
+                <h3>Сканер QR</h3>
+                <div id="qr-reader"></div>
+
+                <div id="controls" style="margin-top: .75rem;">
+                    <select id="cameraSelect" aria-label="Вибір камери"></select>
+                    <button id="btnStart" class="secondary">Старт сканера</button>
+                    <button id="btnStop" class="secondary" disabled>Стоп</button>
+                </div>
+
+                <p id="msg" class="small muted-text"></p>
+
+                <hr />
+
+                <div id="actionRow" style="display:none; gap:.5rem;">
+                    <button id="btnShowHint">Отримати підказку</button>
+                    <button id="btnScanAgain" class="secondary">Просканувати знову</button>
+                </div>
+
+                <div id="hintPanel" class="card" style="margin-top:1rem;">
+                    <strong>Підказка</strong>
+                    <iframe id="hintFrame" title="Підказка"></iframe>
+                    <p class="small muted-text" style="margin-top:.5rem;">Порада: якщо сторінка підказки не відкрилась,
+                        переконайтесь, що файл існує в <code>hints/</code> і названий як <code>01.html … 20.html</code>.
+                    </p>
+                </div>
+            </section>
+
+            <!-- Права колонка: Прогрес/Маршрут -->
+            <section class="card">
+                <h3>Ваш прогрес</h3>
+                <p id="progressText" class="small muted-text">0 / 20 пройдено</p>
+                <div id="badges" class="badges"></div>
+
+                <details style="margin-top:1rem;">
+                    <summary>Що відбувається “під капотом”?</summary>
+                    <p class="small">
+                        Під час першого сканування створюється випадковий маршрут з 20 станцій.
+                        Якщо ви спочатку сканували, наприклад, станцію 7 — маршрут почнеться з неї.
+                        Дані (маршрут і відвідані станції) зберігаються у вашому браузері (<code>localStorage</code>).
+                    </p>
+                </details>
+
+                <div style="margin-top:1rem; display:flex; gap:.5rem; flex-wrap:wrap;">
+                    <button id="btnReset" class="contrast outline">Почати спочатку</button>
+                </div>
+            </section>
+        </div>
+
+        <footer>
+            <p class="small muted-text">
+                Потрібні підказки? Створіть сторінки: <code>/hints/01.html</code>, <code>/hints/02.html</code>, …,
+                <code>/hints/20.html</code>.
+                QR-коди під плакатами мають містити номер станції (наприклад, <code>station:07</code>).
+            </p>
+        </footer>
+    </main>
+
+    <script>
+        // ===== Налаштування =====
+        const TOTAL_STATIONS = 20;
+
+        // Мапа станцій → шлях до підказки (можете відредагувати під свої файли)
+        function hintUrlFor(id) {
+            const two = String(id).padStart(2, '0');
+            // Відносний шлях працює і на кореневій, і на GitHub Pages підпапці
+            return `hints/${two}.html`;
+        }
+
+        // ===== Стан/LocalStorage =====
+        const LS_KEYS = {
+            route: 'peace_alley_route_v1',
+            visited: 'peace_alley_visited_v1',
+            index: 'peace_alley_index_v1'
+        };
+
+        let route = loadRoute();            // масив ID (перестановка 1..20)
+        let visited = loadVisited();        // множина (Set) відвіданих
+        let currentIndex = loadIndex();     // очікуваний індекс у route (0..20)
+        let waitingForHintForId = null;     // який id ми щойно коректно просканували
+
+        function loadRoute() {
+            try { return JSON.parse(localStorage.getItem(LS_KEYS.route)) || null; } catch { return null; }
+        }
+        function saveRoute(arr) { localStorage.setItem(LS_KEYS.route, JSON.stringify(arr)); }
+
+        function loadVisited() {
+            try {
+                const a = JSON.parse(localStorage.getItem(LS_KEYS.visited));
+                return new Set(Array.isArray(a) ? a : []);
+            } catch { return new Set(); }
+        }
+        function saveVisited(set) { localStorage.setItem(LS_KEYS.visited, JSON.stringify([...set])); }
+
+        function loadIndex() {
+            const raw = localStorage.getItem(LS_KEYS.index);
+            return raw === null ? 0 : parseInt(raw, 10);
+        }
+        function saveIndex(i) { localStorage.setItem(LS_KEYS.index, String(i)); }
+
+        function resetAll() {
+            route = null;
+            visited = new Set();
+            currentIndex = 0;
+            waitingForHintForId = null;
+            localStorage.removeItem(LS_KEYS.route);
+            localStorage.removeItem(LS_KEYS.visited);
+            localStorage.removeItem(LS_KEYS.index);
+            updateUI();
+            stopScanner();
+            initScanner(); // перезапуск для чистого стану
+            setMsg('Прогрес скинуто. Почніть зі сканування будь-якої станції.', 'warn');
+        }
+
+        // ===== Маршрут =====
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function generateRouteWithStart(startId) {
+            const base = Array.from({ length: TOTAL_STATIONS }, (_, i) => i + 1);
+            shuffle(base);
+            // Повернути маршрут так, щоб startId був першим
+            const idx = base.indexOf(startId);
+            if (idx > 0) {
+                const head = base.slice(idx);
+                const tail = base.slice(0, idx);
+                return [...head, ...tail];
+            }
+            return base;
+        }
+
+        // ===== Парсинг QR → stationId =====
+        function parseStationId(qrText) {
+            if (!qrText || typeof qrText !== 'string') return null;
+            // Шукаємо перше число 1..20 у тексті
+            const m = qrText.match(/(\d{1,2})/);
+            if (!m) return null;
+            const id = parseInt(m[1], 10);
+            if (id >= 1 && id <= TOTAL_STATIONS) return id;
+            return null;
+        }
+
+        // ===== UI =====
+        const badgesEl = document.getElementById('badges');
+        const progressTextEl = document.getElementById('progressText');
+        const hintPanel = document.getElementById('hintPanel');
+        const hintFrame = document.getElementById('hintFrame');
+        const actionRow = document.getElementById('actionRow');
+        const msgEl = document.getElementById('msg');
+
+        function setMsg(text, kind = '') {
+            msgEl.textContent = text || '';
+            msgEl.className = 'small';
+            if (kind === 'ok') msgEl.classList.add('msg-ok');
+            else if (kind === 'warn') msgEl.classList.add('msg-warn');
+            else if (kind === 'err') msgEl.classList.add('msg-err');
+            else msgEl.classList.add('muted-text');
+        }
+
+        function updateUI() {
+            // Бейджі
+            badgesEl.innerHTML = '';
+            const done = visited.size;
+            for (let id = 1; id <= TOTAL_STATIONS; id++) {
+                const b = document.createElement('span');
+                b.className = 'badge';
+                b.textContent = id; // У ПЛАКАТІВ НОМЕРІВ НЕМАЄ; це лише внутрішній трекінг
+                if (visited.has(id)) {
+                    b.classList.add('ok'); b.title = `Станція ${id}: пройдена ✓`;
+                } else if (route && currentIndex < route.length && id === route[currentIndex]) {
+                    b.classList.add('next'); b.title = `Станція ${id}: наступна у вашому маршруті`;
+                } else {
+                    b.classList.add('muted'); b.title = `Станція ${id}: ще попереду`;
+                }
+                badgesEl.appendChild(b);
+            }
+
+            // Прогрес
+            progressTextEl.textContent = `${done} / ${TOTAL_STATIONS} пройдено`;
+
+            // Кнопки/панель підказки
+            if (waitingForHintForId !== null) {
+                actionRow.style.display = '';
+            } else {
+                actionRow.style.display = 'none';
+            }
+        }
+
+        // ===== Сканер =====
+        let html5QrCode = null;
+        let currentCameraId = null;
+        let scannerRunning = false;
+
+        const cameraSelect = document.getElementById('cameraSelect');
+        const btnStart = document.getElementById('btnStart');
+        const btnStop = document.getElementById('btnStop');
+        const btnShowHint = document.getElementById('btnShowHint');
+        const btnScanAgain = document.getElementById('btnScanAgain');
+        const btnReset = document.getElementById('btnReset');
+
+        async function initScanner() {
+            try {
+                html5QrCode = new Html5Qrcode('qr-reader');
+                const cameras = await Html5Qrcode.getCameras();
+                cameraSelect.innerHTML = '';
+                if (!cameras || cameras.length === 0) {
+                    setMsg('Камеру не знайдено. Дозвольте доступ до камери або під’єднайте пристрій.', 'err');
+                    btnStart.disabled = true;
+                    return;
+                }
+                // Обираємо "задню" камеру, якщо можливо
+                let preferredIndex = 0;
+                cameras.forEach((cam, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = cam.id;
+                    opt.textContent = cam.label || `Камера ${i + 1}`;
+                    cameraSelect.appendChild(opt);
+                    if (/back|rear|environment/i.test(cam.label || '')) preferredIndex = i;
+                });
+                cameraSelect.selectedIndex = preferredIndex;
+                currentCameraId = cameras[preferredIndex].id;
+                btnStart.disabled = false;
+                setMsg('Готово до сканування. Натисніть “Старт сканера”.', 'ok');
+            } catch (e) {
+                setMsg('Помилка ініціалізації сканера: ' + e, 'err');
+            }
+        }
+
+        async function startScanner() {
+            if (!html5QrCode || scannerRunning) return;
+            currentCameraId = cameraSelect.value;
+            const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
+            try {
+                await html5QrCode.start(
+                    { deviceId: { exact: currentCameraId } },
+                    config,
+                    onScanSuccess,
+                    onScanFailure
+                );
+                scannerRunning = true;
+                btnStart.disabled = true;
+                btnStop.disabled = false;
+                setMsg('Сканер запущено. Наведіть камеру на QR-код.', 'ok');
+            } catch (e) {
+                setMsg('Не вдалося запустити сканер: ' + e, 'err');
+            }
+        }
+
+        async function stopScanner() {
+            if (!html5QrCode || !scannerRunning) return;
+            try {
+                await html5QrCode.stop();
+                scannerRunning = false;
+                btnStart.disabled = false;
+                btnStop.disabled = true;
+                setMsg('Сканер зупинено.');
+            } catch (e) {
+                setMsg('Помилка зупинки сканера: ' + e, 'err');
+            }
+        }
+
+        function onScanFailure(/* error */) {
+            // ігноруємо щиття без коду, щоб не засмічувати повідомлення
+        }
+
+        let lastScanText = null;
+        let lastScanTime = 0;
+
+        async function onScanSuccess(decodedText) {
+            const now = Date.now();
+            if (decodedText === lastScanText && now - lastScanTime < 1200) {
+                return; // анти-дубль
+            }
+            lastScanText = decodedText;
+            lastScanTime = now;
+
+            const stationId = parseStationId(decodedText);
+            if (!stationId) {
+                setMsg('Це не схоже на коректний код станції (очікується число 1..20).', 'err');
+                return;
+            }
+
+            // Якщо маршруту ще немає — будуємо з цією станцією як стартом.
+            if (!route) {
+                route = generateRouteWithStart(stationId);
+                currentIndex = 0;
+                saveRoute(route);
+                saveIndex(currentIndex);
+            }
+
+            // Перевіряємо, чи це очікувана наступна зупинка
+            const expectedId = route[currentIndex] ?? null;
+            if (stationId !== expectedId) {
+                // вже відмічена? (щоб повідомлення було дружнє)
+                if (visited.has(stationId)) {
+                    setMsg(`Станція ${stationId} вже пройдена. Знайдіть вашу поточну: станцію ${expectedId}.`, 'warn');
+                } else {
+                    setMsg(`Це не ваша наступна станція. Зараз вам потрібна станція ${expectedId}.`, 'warn');
+                }
+                waitingForHintForId = null;
+                updateUI();
+                return;
+            }
+
+            // Валідно: позначаємо відвіданою й готуємо підказку до наступної
+            visited.add(stationId);
+            saveVisited(visited);
+            currentIndex = Math.min(currentIndex + 1, route.length);
+            saveIndex(currentIndex);
+
+            waitingForHintForId = stationId; // щойно сканована правильна
+            updateUI();
+            setMsg(`Чудово! Станція ${stationId} зарахована. Натисніть “Отримати підказку”.`, 'ok');
+
+            // Зупиняємо сканер, щоб не ловити повтори, поки показуємо підказку
+            stopScanner();
+        }
+
+        // ===== Дії кнопок =====
+        btnStart.addEventListener('click', startScanner);
+        btnStop.addEventListener('click', stopScanner);
+        cameraSelect.addEventListener('change', () => {
+            if (scannerRunning) {
+                stopScanner().then(startScanner);
+            }
+        });
+
+        btnShowHint.addEventListener('click', () => {
+            if (waitingForHintForId === null) return;
+
+            // Обчислюємо НАСТУПНУ станцію у маршруті
+            const nextId = route[currentIndex] ?? null;
+
+            if (!nextId) {
+                // маршрут завершено
+                hintFrame.srcdoc = `
+          <main style="font-family:system-ui,sans-serif;padding:1rem 1.25rem;">
+            <h2>Фініш!</h2>
+            <p>Ви пройшли всі станції Алеї миру. Поверніться до вчителя за відзнакою або наступним завданням.</p>
+          </main>`;
+            } else {
+                hintFrame.src = hintUrlFor(nextId);
+            }
+
+            hintPanel.style.display = '';
+            actionRow.style.display = '';
+        });
+
+        btnScanAgain.addEventListener('click', () => {
+            hintPanel.style.display = 'none';
+            waitingForHintForId = null;
+            updateUI();
+            startScanner();
+        });
+
+        btnReset.addEventListener('click', () => {
+            if (confirm('Скинути весь прогрес і створити новий маршрут при наступному скануванні?')) {
+                resetAll();
+            }
+        });
+
+        // ===== Старт =====
+        updateUI();
+        initScanner();
+
+        // Безпека: звільнити камеру при виході/перезавантаженні
+        window.addEventListener('beforeunload', () => { if (scannerRunning) html5QrCode.stop(); });
+    </script>
+
+    <noscript>
+        <p><strong>Для роботи потрібен JavaScript.</strong> Увімкніть його у браузері.</p>
+    </noscript>
+</body>
+
+</html>
