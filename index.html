@@ -163,7 +163,6 @@
                 <div id="qr-reader"></div>
 
                 <div id="controls" style="margin-top: .75rem;">
-                    <select id="cameraSelect" aria-label="Вибір камери"></select>
                     <button id="btnStart" class="secondary">Старт сканера</button>
                     <button id="btnStop" class="secondary" disabled>Стоп</button>
                 </div>
@@ -353,10 +352,8 @@
 
         // ===== Сканер =====
         let html5QrCode = null;
-        let currentCameraId = null;
         let scannerRunning = false;
 
-        const cameraSelect = document.getElementById('cameraSelect');
         const btnStart = document.getElementById('btnStart');
         const btnStop = document.getElementById('btnStop');
         const btnShowHint = document.getElementById('btnShowHint');
@@ -366,26 +363,8 @@
         async function initScanner() {
             try {
                 html5QrCode = new Html5Qrcode('qr-reader');
-                const cameras = await Html5Qrcode.getCameras();
-                cameraSelect.innerHTML = '';
-                if (!cameras || cameras.length === 0) {
-                    setMsg('Камеру не знайдено. Дозвольте доступ до камери або під’єднайте пристрій.', 'err');
-                    btnStart.disabled = true;
-                    return;
-                }
-                // Обираємо "задню" камеру, якщо можливо
-                let preferredIndex = 0;
-                cameras.forEach((cam, i) => {
-                    const opt = document.createElement('option');
-                    opt.value = cam.id;
-                    opt.textContent = cam.label || `Камера ${i + 1}`;
-                    cameraSelect.appendChild(opt);
-                    if (/back|rear|environment/i.test(cam.label || '')) preferredIndex = i;
-                });
-                cameraSelect.selectedIndex = preferredIndex;
-                currentCameraId = cameras[preferredIndex].id;
                 btnStart.disabled = false;
-                setMsg('Готово до сканування. Натисніть “Старт сканера”.', 'ok');
+                setMsg('Готово до сканування. Натисніть "Старт сканера".', 'ok');
             } catch (e) {
                 setMsg('Помилка ініціалізації сканера: ' + e, 'err');
             }
@@ -393,11 +372,11 @@
 
         async function startScanner() {
             if (!html5QrCode || scannerRunning) return;
-            currentCameraId = cameraSelect.value;
             const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
             try {
+                // Use front-facing camera (user-facing)
                 await html5QrCode.start(
-                    { deviceId: { exact: currentCameraId } },
+                    { facingMode: "user" },
                     config,
                     onScanSuccess,
                     onScanFailure
@@ -484,11 +463,6 @@
         // ===== Дії кнопок =====
         btnStart.addEventListener('click', startScanner);
         btnStop.addEventListener('click', stopScanner);
-        cameraSelect.addEventListener('change', () => {
-            if (scannerRunning) {
-                stopScanner().then(startScanner);
-            }
-        });
 
         btnShowHint.addEventListener('click', () => {
             if (waitingForHintForId === null) return;

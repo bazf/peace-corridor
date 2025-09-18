@@ -1,0 +1,180 @@
+Peace Alley — QR Hunt (Requirements)
+Overview
+
+A browser-based scavenger hunt for the school corridor: 20 poster “stations” hang on the walls, each with a QR code. Students open a single web page (hosted on GitHub Pages), scan the QR under a poster, then press Get Hint to see where to go next. Each student’s route is randomized to reduce crowding. Progress is tracked locally in the browser.
+
+Goals
+
+Guide students through all 20 stations in a unique random order per device.
+
+Keep the experience offline-friendly (no server) and simple to deploy via GitHub Pages.
+
+Make it usable for 6th grade students with clear UI and big buttons.
+
+Functional Requirements
+Stations & Hints
+
+There are 20 physical stations (posters) placed along the corridor.
+
+Each station has a QR code encoding its station number (1–20).
+
+Accept formats like station:07 or any text/URL containing a 1–2 digit number 1..20.
+
+Hints are hosted as HTML sub-pages on GitHub Pages under hints/01.html … hints/20.html.
+
+The main page embeds the hint page in an iframe after the student presses Get Hint.
+
+Main Page (Single HTML)
+
+A single, non-React HTML page with plain JavaScript.
+
+Includes:
+
+QR scanner area (using a JS library).
+
+Button Get Hint (shown after a successful scan).
+
+Button Scan Again (hides the hint and re-enables the scanner).
+
+Progress tracker with 20 badges; each completed station turns green.
+
+Reset button at the bottom: Start Over (clears all progress and route).
+
+Routing Logic
+
+On the first successful scan, the app:
+
+Generates a random permutation of all stations 1..20.
+
+Rotates this permutation so that the scanned station is first (becomes the student’s starting station).
+
+The app enforces one-direction traversal: it accepts only the next expected station in that student’s route.
+
+If a different station is scanned:
+
+If it’s already completed → show a friendly message.
+
+If it’s out-of-order → prompt the user to find the expected station.
+
+After each correct scan:
+
+Mark that station completed (green badge).
+
+Get Hint loads the next station’s hint page in the iframe.
+
+When all 20 are complete, Get Hint shows a simple Finish message.
+
+Persistence (Local Storage)
+
+Store the following in localStorage:
+
+The route (random permutation starting from the first scanned station).
+
+The visited set of stations.
+
+The current index in the route.
+
+Reset clears all local storage and restores the app to pre-scan state.
+
+Non-Functional Requirements
+Technology & Libraries
+
+No frameworks (no React/Vue/etc.). Plain HTML + JS.
+
+Styling: a small, elegant CSS library (e.g., Pico.css) for a clean look.
+
+QR Scanning: a browser QR library (e.g., html5-qrcode) with:
+
+Camera selection (prefer rear camera on mobile).
+
+Start/Stop controls.
+
+Debounce/duplicate scan protection.
+
+Accessibility & UX
+
+Large, readable buttons and clear status messages.
+
+Works on mobile devices (portrait-friendly).
+
+Handles missing camera permissions gracefully with helpful guidance.
+
+Deployment
+
+Host the main page at the repository root (or project subfolder) on GitHub Pages.
+
+Place hint pages under /hints/01.html … /hints/20.html.
+
+All references should be relative paths so it works at root or subpath.
+
+Privacy & Security
+
+No user accounts and no network storage of progress.
+
+Camera access is local only through the browser’s permissions.
+
+The app never transmits scan results off-device.
+
+Content Structure
+/ (GitHub Pages root or subfolder)
+  index.html            # main app (scanner, buttons, progress)
+  /hints/
+    01.html
+    02.html
+    ...
+    20.html
+
+
+Each hint file is a simple HTML page with a short, student-friendly hint (no scripts required).
+
+Hints should direct students to identify the next station’s theme or visual feature.
+
+QR Code Content Spec
+
+Recommended payload: station:NN where NN is 01..20.
+
+The app will also accept any content containing a number 1..20 (e.g., https://example/hints/07.html).
+
+Local Storage Keys (example)
+
+peace_alley_route_v1 → JSON array of station IDs, e.g., [7, 12, 3, ...]
+
+peace_alley_visited_v1 → JSON array of visited IDs, e.g., [7, 12]
+
+peace_alley_index_v1 → current route index, e.g., 2
+
+Acceptance Criteria (Checklist)
+
+ Main page loads on GitHub Pages and requests camera permission when Start Scanner is pressed.
+
+ On the first correct scan, a random route is generated and rotated to start from the scanned station.
+
+ Only the expected next station unlocks Get Hint. Wrong/out-of-order scans show a helpful message.
+
+ Get Hint loads hints/NN.html for the next station; Scan Again hides the hint and re-enables scanning.
+
+ Progress shows 20 badges; completed stations are green; the current expected station is visually highlighted.
+
+ Reset clears progress and route; next scan creates a brand-new random route.
+
+ Data persists across refreshes (until reset) via localStorage.
+
+ Works on common mobile browsers (Chromium/WebKit) with rear-camera preference.
+
+ All links are relative, so the site works from a repo root or subfolder.
+
+Nice-to-Haves
+
+Auto-pause scanner when a correct scan occurs (avoid duplicate scans while hint is open).
+
+“Help” accordion with a short explanation of how routes are generated and stored.
+
+Minimal finish page (in-iframe) with congratulatory text and next steps (e.g., “see teacher for stamp”).
+
+Notes for Content Authors
+
+Keep hints short and age-appropriate (6th grade).
+
+Ensure each poster’s visual element clearly relates to its hint.
+
+Space the posters to minimize backtracking; the app already staggers student routes randomly to reduce crowding.
