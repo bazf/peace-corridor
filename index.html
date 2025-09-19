@@ -215,6 +215,10 @@
     <script>
         // ===== Налаштування =====
         const TOTAL_STATIONS = 20;
+        // НОВА ЛОГІКА: послідовний (фіксований) цикл 1→2→...→20→(повернення до 1, тільки як посилання у підказці 20)
+        // Кожен учень може почати з будь-якої станції. З цього моменту його порядок = start, start+1, ... 20, 1, 2 ... (поки не пройдено всі 20 УНІКАЛЬНИХ).
+        // Тож ми зберігаємо лише: startId, visited (множина), поточний expectedId.
+        // Маршрут не рандомний — забираємо попередню логіку shuffle.
 
         // Мапа станцій → шлях до підказки (можете відредагувати під свої файли)
         function hintUrlFor(id) {
@@ -225,69 +229,54 @@
 
         // ===== Стан/LocalStorage =====
         const LS_KEYS = {
-            route: 'peace_alley_route_v1',
-            visited: 'peace_alley_visited_v1',
-            index: 'peace_alley_index_v1'
+            start: 'peace_alley_start_v2',   // перша просканована станція (старт циклу)
+            visited: 'peace_alley_visited_v2', // масив відвіданих
+            expected: 'peace_alley_expected_v2' // поточна очікувана станція (наступна, яку треба ЗІСКАНУВАТИ)
         };
 
-        let route = loadRoute();            // масив ID (перестановка 1..20)
-        let visited = loadVisited();        // множина (Set) відвіданих
-        let currentIndex = loadIndex();     // очікуваний індекс у route (0..20)
-        let waitingForHintForId = null;     // який id ми щойно коректно просканували
+        let startId = loadStart();          // число або null
+        let visited = loadVisited();        // Set
+        let expectedId = loadExpected();    // число або null
+        let waitingForHintForId = null;     // щойно коректно просканована, для якої показали підказку
 
-        function loadRoute() {
-            try { return JSON.parse(localStorage.getItem(LS_KEYS.route)) || null; } catch { return null; }
+        function loadStart() {
+            const raw = localStorage.getItem(LS_KEYS.start);
+            return raw ? parseInt(raw, 10) : null;
         }
-        function saveRoute(arr) { localStorage.setItem(LS_KEYS.route, JSON.stringify(arr)); }
+        function saveStart(id) { localStorage.setItem(LS_KEYS.start, String(id)); }
 
         function loadVisited() {
             try {
-                const a = JSON.parse(localStorage.getItem(LS_KEYS.visited));
-                return new Set(Array.isArray(a) ? a : []);
+                const arr = JSON.parse(localStorage.getItem(LS_KEYS.visited));
+                return new Set(Array.isArray(arr) ? arr : []);
             } catch { return new Set(); }
         }
         function saveVisited(set) { localStorage.setItem(LS_KEYS.visited, JSON.stringify([...set])); }
 
-        function loadIndex() {
-            const raw = localStorage.getItem(LS_KEYS.index);
-            return raw === null ? 0 : parseInt(raw, 10);
+        function loadExpected() {
+            const raw = localStorage.getItem(LS_KEYS.expected);
+            return raw ? parseInt(raw, 10) : null;
         }
-        function saveIndex(i) { localStorage.setItem(LS_KEYS.index, String(i)); }
+        function saveExpected(id) { localStorage.setItem(LS_KEYS.expected, String(id)); }
 
         function resetAll() {
-            route = null;
+            startId = null;
             visited = new Set();
-            currentIndex = 0;
+            expectedId = null;
             waitingForHintForId = null;
-            localStorage.removeItem(LS_KEYS.route);
+            localStorage.removeItem(LS_KEYS.start);
             localStorage.removeItem(LS_KEYS.visited);
-            localStorage.removeItem(LS_KEYS.index);
+            localStorage.removeItem(LS_KEYS.expected);
             updateUI();
             stopScanner();
-            initScanner(); // перезапуск для чистого стану
-            setMsg('🔄 Прогрес скинуто. Почніть зі сканування будь-якої станції.', 'warn');
+            initScanner();
+            setMsg('🔄 Прогрес скинуто. Проскануйте будь-яку станцію, щоб почати послідовність.', 'warn');
         }
 
         // ===== Маршрут =====
-        function shuffle(array) {
-            for (let i = array.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[j], array[i]];
-            }
-            return array;
-        }
-
-        function generateRouteWithStart(startId) {
-            const base = Array.from({ length: TOTAL_STATIONS }, (_, i) => i + 1);
-            shuffle(base);
-            // Повернути маршрут так, щоб startId був першим
-            const idx = base.indexOf(startId);
-            if (idx > 0) {
-                const head = base.slice(idx);
-                const tail = base.slice(0, idx);
-                return [...head, ...tail];
-            }
-            return base;
+        // ===== Допоміжне для послідовності =====
+        function nextSequential(id) {
+            return id === TOTAL_STATIONS ? 1 : id + 1;
         }
 
         // ===== Парсинг QR → stationId =====
@@ -324,22 +313,21 @@
             }
         }
 
-        function showHintModal(nextId) {
-            if (!nextId) {
-                // маршрут завершено
-                hintFrame.srcdoc = `
-                    <main style="font-family:system-ui,sans-serif;padding:2rem;text-align:center;">
-                        <h2 style="color:#10b981;font-size:2rem;margin-bottom:1rem;">🎉 Вітаємо!</h2>
-                        <p style="font-size:1.125rem;line-height:1.6;color:#374151;">Ви пройшли всі станції Алеї миру!</p>
-                        <p style="margin-top:1rem;color:#6b7280;">Поверніться до вчителя за відзнакою або наступним завданням.</p>
-                    </main>`;
-            } else {
-                hintFrame.src = hintUrlFor(nextId);
-            }
+        function showHintModal(justScannedId) {
+            // Показуємо підказку для НАСТУПНОЇ станції (не поточної!)
+            // justScannedId - це станція, яку щойно просканували
+            // Потрібно показати підказку до наступної станції у послідовності
 
+            if (visited.size >= TOTAL_STATIONS || !expectedId) {
+                // Всі відвідані або фініш — показуємо фінальну сторінку
+                hintFrame.src = hintUrlFor(20);
+            } else {
+                // Показуємо підказку до наступної станції (expectedId)
+                hintFrame.src = hintUrlFor(expectedId);
+            }
             hintModal.classList.remove('hidden');
             hintModal.children[0].classList.add('modal-enter');
-            document.body.style.overflow = 'hidden'; // заблокувати прокрутку
+            document.body.style.overflow = 'hidden';
         }
 
         function hideHintModal() {
@@ -366,9 +354,9 @@
                 if (visited.has(id)) {
                     b.classList.add('bg-gradient-to-br', 'from-green-500', 'to-emerald-500', 'text-white', 'shadow-lg');
                     b.title = `Станція ${id}: пройдена ✓`;
-                } else if (route && currentIndex < route.length && id === route[currentIndex]) {
+                } else if (expectedId === id) {
                     b.classList.add('bg-gradient-to-br', 'from-yellow-400', 'to-orange-500', 'text-white', 'badge-pulse', 'shadow-lg');
-                    b.title = `Станція ${id}: наступна у вашому маршруті`;
+                    b.title = `Станція ${id}: наступна у вашій послідовності`;
                 } else {
                     b.classList.add('bg-white/30', 'text-gray-600', 'backdrop-blur-sm');
                     b.title = `Станція ${id}: ще попереду`;
@@ -449,53 +437,69 @@
             lastScanText = decodedText;
             lastScanTime = now;
 
-            const stationId = parseStationId(decodedText);
-            if (!stationId) {
-                setMsg('Це не твоя станція!', 'err');
+            const scannedId = parseStationId(decodedText);
+            if (!scannedId) {
+                setMsg('Не вдалося визначити номер станції в QR.', 'err');
                 return;
             }
 
-            // Якщо маршруту ще немає — будуємо з цією станцією як стартом.
-            if (!route) {
-                route = generateRouteWithStart(stationId);
-                currentIndex = 0;
-                saveRoute(route);
-                saveIndex(currentIndex);
-            }
-
-            // Перевіряємо, чи це очікувана наступна зупинка
-            const expectedId = route[currentIndex] ?? null;
-            if (stationId !== expectedId) {
-                if (visited.has(stationId)) {
-                    // Користувач повторно просканував вже пройдену станцію → просто знову показуємо поточну підказку
-                    const nextId = expectedId; // може бути null (завершення маршруту)
-                    stopScanner();
-                    showHintModal(nextId);
-                    setMsg('', ''); // без повідомлення
-                } else {
-                    setMsg(`Це не ваша наступна станція. Зараз вам потрібна станція ${expectedId}.`, 'warn');
-                }
-                waitingForHintForId = null;
+            // Ініціалізація старту
+            if (!startId) {
+                startId = scannedId;
+                saveStart(startId);
+                visited.add(scannedId);
+                saveVisited(visited);
+                expectedId = nextSequential(scannedId);
+                saveExpected(expectedId);
+                waitingForHintForId = scannedId;
                 updateUI();
+                setMsg(`Початок! Старт зі станції ${scannedId}.`, 'ok');
+                stopScanner();
+                showHintModal(scannedId);
                 return;
             }
 
-            // Валідно: позначаємо відвіданою й готуємо підказку до наступної
-            visited.add(stationId);
+            // Якщо вже завершено (відвідані всі): показати 20 (фініш)
+            if (visited.size >= TOTAL_STATIONS) {
+                setMsg('Усі станції вже пройдено. Можете перезапустити.', 'warn');
+                stopScanner();
+                showHintModal(20);
+                waitingForHintForId = null;
+                return;
+            }
+
+            // Перевіряємо очікувану станцію
+            if (scannedId !== expectedId) {
+                if (visited.has(scannedId)) {
+                    setMsg(`Станція ${scannedId} вже була. Зараз шукайте ${expectedId}.`, 'warn');
+                } else {
+                    setMsg(`Це не та станція. Потрібна ${expectedId}.`, 'warn');
+                }
+                return;
+            }
+
+            // Коректна наступна станція
+            visited.add(scannedId);
             saveVisited(visited);
-            currentIndex = Math.min(currentIndex + 1, route.length);
-            saveIndex(currentIndex);
 
-            waitingForHintForId = stationId; // щойно сканована правильна
+            // Оновлюємо expectedId якщо ще не всі пройдено
+            if (visited.size < TOTAL_STATIONS) {
+                expectedId = nextSequential(scannedId);
+                // expectedId не може бути стартовим ще раз, поки не пройдені всі, але якщо старт був наприкінці — працює
+                // Якщо очікувана вже у visited (можливо через цикл?) — просуваємося поки знайдемо першу невідвідану
+                while (visited.has(expectedId) && visited.size < TOTAL_STATIONS) {
+                    expectedId = nextSequential(expectedId);
+                }
+            } else {
+                expectedId = null; // завершено
+            }
+            saveExpected(expectedId === null ? '' : expectedId);
+
+            waitingForHintForId = scannedId;
             updateUI();
-            setMsg(`Чудово! Станція ${stationId} зарахована.`, 'ok');
-
-            // Зупиняємо сканер, щоб не ловити повтори під час показу підказки
+            setMsg(`Чудово! Станцію ${scannedId} додано.`, 'ok');
             stopScanner();
-
-            // Автоматично показуємо підказку до наступної станції
-            const nextId = route[currentIndex] ?? null;
-            showHintModal(nextId);
+            showHintModal(scannedId);
         }
 
         // ===== Дії кнопок =====
@@ -538,7 +542,7 @@
         });
 
         btnReset.addEventListener('click', () => {
-            if (confirm('Скинути весь прогрес і створити новий маршрут при наступному скануванні?')) {
+            if (confirm('Скинути весь прогрес і почати нову послідовність зі сканування будь-якої станції?')) {
                 hideHintModal();
                 resetAll();
             }
@@ -547,6 +551,17 @@
         // ===== Старт =====
         updateUI();
         initScanner();
+        // Якщо дані вже були (продовження сеансу) — переконаємося, що expectedId валідний.
+        if (startId && !expectedId && visited.size < TOTAL_STATIONS) {
+            // Відновити очікувану як першу не відвідану від startId по колу
+            let probe = nextSequential(startId);
+            while (visited.has(probe) && visited.size < TOTAL_STATIONS) {
+                probe = nextSequential(probe);
+            }
+            expectedId = visited.size >= TOTAL_STATIONS ? null : probe;
+            saveExpected(expectedId === null ? '' : expectedId);
+            updateUI();
+        }
 
         // Безпека: звільнити камеру при виході/перезавантаженні
         window.addEventListener('beforeunload', () => { if (scannerRunning) html5QrCode.stop(); });

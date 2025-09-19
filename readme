@@ -1,95 +1,64 @@
-Peace Alley — QR Hunt (Requirements)
+Peace Alley — QR Hunt (Updated Sequential Version)
 Overview
 
-A browser-based scavenger hunt for the school corridor: 20 poster “stations” hang on the walls, each with a QR code. Students open a single web page (hosted on GitHub Pages), scan the QR under a poster, then press Get Hint to see where to go next. Each student’s route is randomized to reduce crowding. Progress is tracked locally in the browser.
+Browser-based corridor quest: 20 poster “stations”, each with a QR code encoding its station number (1–20). The student opens the single web page (GitHub Pages). They may start by scanning ANY station. From that point the path is a fixed circular sequence:
+
+ startStation → (startStation+1) → … → 20 → 1 → 2 … until all 20 unique stations are collected.
+
+Hints on each station’s page describe the NEXT station in the fixed chain. Progress is stored locally (no server). This version REMOVES the old random-permutation logic.
 
 Goals
 
-Guide students through all 20 stations in a unique random order per device.
-
-Keep the experience offline-friendly (no server) and simple to deploy via GitHub Pages.
-
-Make it usable for 6th grade students with clear UI and big buttons.
+• Allow starting from any station.
+• Enforce one-direction, no skipping (must scan the expected next station).
+• Finish after all 20 distinct stations scanned exactly once.
+• Offline-friendly, quick deploy via GitHub Pages.
+• Simple UI for ~6th grade: large buttons, clear feedback.
 
 Functional Requirements
 Stations & Hints
 
-There are 20 physical stations (posters) placed along the corridor.
-
-Each station has a QR code encoding its station number (1–20).
-
-Accept formats like station:07 or any text/URL containing a 1–2 digit number 1..20.
-
-Hints are hosted as HTML sub-pages on GitHub Pages under hints/01.html … hints/20.html.
-
-The main page embeds the hint page in an iframe after the student presses Get Hint.
+• 20 physical stations (posters) with QR codes.
+• QR content: recommended format station:NN (NN = 01..20) but any text containing a number 1–20 is parsed.
+• Hint pages: /hints/01.html … /hints/20.html. Each page’s text gives the clue for the NEXT station in the fixed order.
+• Station 20’s page is the finish and references returning conceptually to Station 1 (symbolic loop close).
 
 Main Page (Single HTML)
 
-A single, non-React HTML page with plain JavaScript.
-
-Includes:
-
-QR scanner area (using a JS library).
-
-Button Get Hint (shown after a successful scan).
-
-Button Scan Again (hides the hint and re-enables the scanner).
-
-Progress tracker with 20 badges; each completed station turns green.
-
-Reset button at the bottom: Start Over (clears all progress and route).
+Single `index.html` (no framework) + plain JS:
+• QR scanner area (html5-qrcode).
+• Modal automatically shows hint for the station just scanned (removed manual Get Hint button in this version logic—scanner auto-stops to avoid duplicates).
+• “Продовжити сканування” button to resume scanning.
+• Progress grid: 20 badges; completed = green, next expected = pulsing.
+• Reset button clears all stored progress.
 
 Routing Logic
 
-On the first successful scan, the app:
-
-Generates a random permutation of all stations 1..20.
-
-Rotates this permutation so that the scanned station is first (becomes the student’s starting station).
-
-The app enforces one-direction traversal: it accepts only the next expected station in that student’s route.
-
-If a different station is scanned:
-
-If it’s already completed → show a friendly message.
-
-If it’s out-of-order → prompt the user to find the expected station.
-
-After each correct scan:
-
-Mark that station completed (green badge).
-
-Get Hint loads the next station’s hint page in the iframe.
-
-When all 20 are complete, Get Hint shows a simple Finish message.
+1. First scan defines startId.
+2. Expected next station = (startId + 1) modulo cycle (1 after 20).
+3. Student must scan exactly the expectedId. Any other scan:
+  • If already visited → message “Already done, look for X”.
+  • If not visited but not expected → message “Need station X”.
+4. After a correct scan:
+  • Add to visited.
+  • Compute next expected by advancing sequentially until an unvisited ID (wrap-around). Stop when all 20 collected.
+5. When all 20 visited: show finish (station 20 page) and no further expected station.
 
 Persistence (Local Storage)
 
-Store the following in localStorage:
+Keys (v2):
+• peace_alley_start_v2 → start station number (int) or null until first scan.
+• peace_alley_visited_v2 → JSON array of visited station numbers.
+• peace_alley_expected_v2 → next required station number (or empty string when finished).
 
-The route (random permutation starting from the first scanned station).
-
-The visited set of stations.
-
-The current index in the route.
-
-Reset clears all local storage and restores the app to pre-scan state.
+Reset removes all three keys. (Old v1 random-route keys are deprecated.)
 
 Non-Functional Requirements
 Technology & Libraries
 
-No frameworks (no React/Vue/etc.). Plain HTML + JS.
-
-Styling: a small, elegant CSS library (e.g., Pico.css) for a clean look.
-
-QR Scanning: a browser QR library (e.g., html5-qrcode) with:
-
-Camera selection (prefer rear camera on mobile).
-
-Start/Stop controls.
-
-Debounce/duplicate scan protection.
+• Plain HTML + JS (no frameworks).
+• Tailwind via CDN for styling (current implementation) — acceptable for static hosting.
+• QR scanning: html5-qrcode (rear camera preference, start/stop, duplicate protection by debouncing identical reads inside 1.2s).
 
 Accessibility & UX
 
@@ -143,38 +112,30 @@ peace_alley_visited_v1 → JSON array of visited IDs, e.g., [7, 12]
 
 peace_alley_index_v1 → current route index, e.g., 2
 
-Acceptance Criteria (Checklist)
+Acceptance Criteria (Sequential Version)
 
- Main page loads on GitHub Pages and requests camera permission when Start Scanner is pressed.
+ [ ] Main page loads; camera permission requested on Start.
+ [ ] First scan sets start station (no randomness) and marks it visited.
+ [ ] Only expected station is accepted; others show guidance message.
+ [ ] Hint modal auto-opens after each valid scan showing that station’s hint (which describes the next one).
+ [ ] Progress badges: visited green, expected pulsing yellow.
+ [ ] After 20th unique scan finish page (station 20) shown; no more expected station displayed.
+ [ ] Reset wipes v2 keys; a new starting scan may be any station again.
+ [ ] Data persists across page refresh until reset.
+ [ ] Relative paths function at root or subfolder GitHub Pages deployment.
 
- On the first correct scan, a random route is generated and rotated to start from the scanned station.
-
- Only the expected next station unlocks Get Hint. Wrong/out-of-order scans show a helpful message.
-
- Get Hint loads hints/NN.html for the next station; Scan Again hides the hint and re-enables scanning.
-
- Progress shows 20 badges; completed stations are green; the current expected station is visually highlighted.
-
- Reset clears progress and route; next scan creates a brand-new random route.
-
- Data persists across refreshes (until reset) via localStorage.
-
- Works on common mobile browsers (Chromium/WebKit) with rear-camera preference.
-
- All links are relative, so the site works from a repo root or subfolder.
-
-Nice-to-Haves
-
-Auto-pause scanner when a correct scan occurs (avoid duplicate scans while hint is open).
-
-“Help” accordion with a short explanation of how routes are generated and stored.
-
-Minimal finish page (in-iframe) with congratulatory text and next steps (e.g., “see teacher for stamp”).
+Nice-to-Haves Implemented
+• Auto-pause scanner after correct scan.
+• Help accordion (brief explanation) retained.
+• Finish page (station 20) present.
 
 Notes for Content Authors
 
-Keep hints short and age-appropriate (6th grade).
+• Keep hints short, age-appropriate (≈6th grade).
+• Each visual should clearly embody the concept referenced in the hint.
+• Physical placement can now be strictly sequential or circular—random crowd reduction no longer applied in software.
 
-Ensure each poster’s visual element clearly relates to its hint.
+Mapping Summary (NEXT relationships):
+1→2, 2→3, 3→4, 4→5, 5→6, 6→7, 7→8, 8→9, 9→10, 10→11, 11→12, 12→13, 13→14, 14→15, 15→16, 16→17, 17→18, 18→19, 19→20, 20→(Finish / symbolic return to 1).
 
-Space the posters to minimize backtracking; the app already staggers student routes randomly to reduce crowding.
+Legacy random-route description retained above only in version control history; this document now reflects the fixed sequential design.
