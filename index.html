@@ -14,25 +14,39 @@
 
     <!-- Custom Tailwind Configuration -->
     <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#6366f1',
+        tailwind.c            // Валідно: позначаємо відвіданою й готуємо підказку до наступної
+        visited.add(stationId);
+        saveVisited(visited);
+        currentIndex = Math.min(currentIndex + 1, route.length);
+        saveIndex(currentIndex);
+
+        waitingForHintForId = stationId; // щойно сканована правильна
+        updateUI();
+        setMsg(`Чудово! Станція ${stationId} зарахована.`, 'ok');
+
+        // Зупиняємо сканер
+        stopScanner();
+
+        // Автоматично показуємо підказку
+        const nextId = route[currentIndex] ?? null;
+        showHintModal(nextId); theme: {
+            extend: {
+                colors: {
+                    primary: '#6366f1',
                         secondary: '#06b6d4',
-                        success: '#10b981',
-                        warning: '#f59e0b',
-                        danger: '#ef4444',
+                            success: '#10b981',
+                                warning: '#f59e0b',
+                                    danger: '#ef4444',
                     },
-                    fontFamily: {
-                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                fontFamily: {
+                    sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
                     },
-                    animation: {
-                        'pulse-soft': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                animation: {
+                    'pulse-soft': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
                         'bounce-soft': 'bounce 1s infinite',
                     }
-                }
             }
+        }
         }
     </script>
 
@@ -79,6 +93,39 @@
             -webkit-text-fill-color: transparent;
             background-clip: text;
         }
+
+        /* Модальне вікно */
+        .modal-enter {
+            animation: modalEnter 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .modal-exit {
+            animation: modalExit 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        @keyframes modalEnter {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        @keyframes modalExit {
+            from {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+
+            to {
+                opacity: 0;
+                transform: scale(0.9) translateY(-20px);
+            }
+        }
     </style>
 </head>
 
@@ -116,22 +163,11 @@
 
             <div id="msg" class="text-sm text-gray-600 bg-gray-100 rounded-xl p-3 min-h-[3rem] flex items-center"></div>
 
-            <div id="actionRow" class="hidden flex gap-3 mt-4">
-                <button id="btnShowHint"
-                    class="flex-1 bg-gradient-to-r from-blue-500 to-cyan-500 text-white py-3 px-4 rounded-2xl font-semibold btn-hover transition-all duration-300 flex items-center justify-center gap-2">
-                    💡 <span>Отримати підказку</span>
-                </button>
+            <div id="actionRow" class="hidden text-center mt-4">
                 <button id="btnScanAgain"
-                    class="flex-1 bg-gradient-to-r from-purple-500 to-indigo-500 text-white py-3 px-4 rounded-2xl font-semibold btn-hover transition-all duration-300 flex items-center justify-center gap-2">
+                    class="bg-gradient-to-r from-purple-500 to-indigo-500 text-white py-3 px-6 rounded-2xl font-semibold btn-hover transition-all duration-300 flex items-center justify-center gap-2 mx-auto">
                     🔄 <span>Сканувати знову</span>
                 </button>
-            </div>
-
-            <div id="hintPanel" class="hidden mt-6 glass-card rounded-2xl p-4 border-2 border-blue-200">
-                <div class="font-semibold text-blue-700 mb-3 flex items-center gap-2">
-                    💡 <span>Підказка</span>
-                </div>
-                <iframe id="hintFrame" title="Підказка" class="w-full h-96 rounded-xl border-0"></iframe>
             </div>
         </div>
 
@@ -162,6 +198,30 @@
                     class="bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 px-6 rounded-2xl font-semibold btn-hover transition-all duration-300 flex items-center justify-center gap-2 mx-auto">
                     🔄 <span>Почати спочатку</span>
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальне вікно з підказкою -->
+    <div id="hintModal"
+        class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="glass-card rounded-3xl max-w-lg w-full max-h-[90vh] overflow-hidden shadow-2xl">
+            <div class="bg-gradient-to-r from-blue-500 to-cyan-500 text-white p-6 flex items-center justify-between">
+                <h3 class="text-xl font-bold flex items-center gap-2">
+                    💡 <span>Підказка до наступної станції</span>
+                </h3>
+                <button id="btnCloseModal" class="text-white/80 hover:text-white text-2xl font-bold transition-colors">
+                    ×
+                </button>
+            </div>
+            <div class="p-6">
+                <iframe id="hintFrame" title="Підказка" class="w-full h-96 rounded-xl border-0 bg-white"></iframe>
+                <div class="mt-6 text-center">
+                    <button id="btnContinueScanning"
+                        class="bg-gradient-to-r from-purple-500 to-indigo-500 text-white py-3 px-6 rounded-2xl font-semibold btn-hover transition-all duration-300 flex items-center justify-center gap-2 mx-auto">
+                        🔄 <span>Продовжити сканування</span>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -258,7 +318,7 @@
         // ===== UI =====
         const badgesEl = document.getElementById('badges');
         const progressTextEl = document.getElementById('progressText');
-        const hintPanel = document.getElementById('hintPanel');
+        const hintModal = document.getElementById('hintModal');
         const hintFrame = document.getElementById('hintFrame');
         const actionRow = document.getElementById('actionRow');
         const msgEl = document.getElementById('msg');
@@ -276,6 +336,36 @@
             } else {
                 msgEl.classList.add('bg-gray-100', 'text-gray-600');
             }
+        }
+
+        function showHintModal(nextId) {
+            if (!nextId) {
+                // маршрут завершено
+                hintFrame.srcdoc = `
+                    <main style="font-family:system-ui,sans-serif;padding:2rem;text-align:center;">
+                        <h2 style="color:#10b981;font-size:2rem;margin-bottom:1rem;">🎉 Вітаємо!</h2>
+                        <p style="font-size:1.125rem;line-height:1.6;color:#374151;">Ви пройшли всі станції Алеї миру!</p>
+                        <p style="margin-top:1rem;color:#6b7280;">Поверніться до вчителя за відзнакою або наступним завданням.</p>
+                    </main>`;
+            } else {
+                hintFrame.src = hintUrlFor(nextId);
+            }
+
+            hintModal.classList.remove('hidden');
+            hintModal.children[0].classList.add('modal-enter');
+            document.body.style.overflow = 'hidden'; // заблокувати прокрутку
+        }
+
+        function hideHintModal() {
+            const modalContent = hintModal.children[0];
+            modalContent.classList.remove('modal-enter');
+            modalContent.classList.add('modal-exit');
+
+            setTimeout(() => {
+                hintModal.classList.add('hidden');
+                modalContent.classList.remove('modal-exit');
+                document.body.style.overflow = ''; // розблокувати прокрутку
+            }, 200);
         }
 
         function updateUI() {
@@ -303,7 +393,7 @@
             // Прогрес
             progressTextEl.textContent = `${done} / ${TOTAL_STATIONS} пройдено`;
 
-            // Кнопки/панель підказки
+            // Кнопка "Сканувати знову"
             if (waitingForHintForId !== null) {
                 actionRow.classList.remove('hidden');
             } else {
@@ -314,12 +404,6 @@
         // ===== Сканер =====
         let html5QrCode = null;
         let scannerRunning = false;
-
-        const btnStart = document.getElementById('btnStart');
-        const btnStop = document.getElementById('btnStop');
-        const btnShowHint = document.getElementById('btnShowHint');
-        const btnScanAgain = document.getElementById('btnScanAgain');
-        const btnReset = document.getElementById('btnReset');
 
         async function initScanner() {
             try {
@@ -381,7 +465,7 @@
 
             const stationId = parseStationId(decodedText);
             if (!stationId) {
-                setMsg('Це не схоже на коректний код станції (очікується число 1..20).', 'err');
+                setMsg('Це не твоя станція!', 'err');
                 return;
             }
 
@@ -422,39 +506,47 @@
         }
 
         // ===== Дії кнопок =====
+        const btnStart = document.getElementById('btnStart');
+        const btnStop = document.getElementById('btnStop');
+        const btnScanAgain = document.getElementById('btnScanAgain');
+        const btnReset = document.getElementById('btnReset');
+        const btnCloseModal = document.getElementById('btnCloseModal');
+        const btnContinueScanning = document.getElementById('btnContinueScanning');
+
         btnStart.addEventListener('click', startScanner);
         btnStop.addEventListener('click', stopScanner);
 
-        btnShowHint.addEventListener('click', () => {
-            if (waitingForHintForId === null) return;
-
-            // Обчислюємо НАСТУПНУ станцію у маршруті
-            const nextId = route[currentIndex] ?? null;
-
-            if (!nextId) {
-                // маршрут завершено
-                hintFrame.srcdoc = `
-          <main style="font-family:system-ui,sans-serif;padding:1rem 1.25rem;">
-            <h2>Фініш!</h2>
-            <p>Ви пройшли всі станції Алеї миру. Поверніться до вчителя за відзнакою або наступним завданням.</p>
-          </main>`;
-            } else {
-                hintFrame.src = hintUrlFor(nextId);
-            }
-
-            hintPanel.classList.remove('hidden');
-            actionRow.classList.remove('hidden');
-        });
-
         btnScanAgain.addEventListener('click', () => {
-            hintPanel.classList.add('hidden');
             waitingForHintForId = null;
             updateUI();
             startScanner();
         });
 
+        btnCloseModal.addEventListener('click', () => {
+            hideHintModal();
+            waitingForHintForId = null;
+            updateUI();
+        });
+
+        btnContinueScanning.addEventListener('click', () => {
+            hideHintModal();
+            waitingForHintForId = null;
+            updateUI();
+            startScanner();
+        });
+
+        // Закрити модальне вікно при кліку на фон
+        hintModal.addEventListener('click', (e) => {
+            if (e.target === hintModal) {
+                hideHintModal();
+                waitingForHintForId = null;
+                updateUI();
+            }
+        });
+
         btnReset.addEventListener('click', () => {
             if (confirm('Скинути весь прогрес і створити новий маршрут при наступному скануванні?')) {
+                hideHintModal();
                 resetAll();
             }
         });
