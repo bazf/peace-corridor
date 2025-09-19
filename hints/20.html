@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="uk">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Підказка 20 - Рушник громади</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 1rem;
+            background: linear-gradient(135deg, #1a237e, #3f51b5, #e3f2fd);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 2.5rem;
+            max-width: 400px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            border: 4px solid #ffd700;
+            position: relative;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            background: linear-gradient(45deg, #ffd700, #ffeb3b, #ffc107, #ffd700);
+            border-radius: 22px;
+            z-index: -1;
+        }
+
+        .emoji {
+            font-size: 5rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        h2 {
+            color: #1a237e;
+            margin: 0 0 1rem 0;
+            font-size: 1.8rem;
+            font-weight: bold;
+        }
+
+        .description {
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 1.5rem;
+            font-style: italic;
+        }
+
+        .hint {
+            background: linear-gradient(135deg, #e8eaf6, #c5cae9);
+            padding: 2rem;
+            border-radius: 15px;
+            color: #1a237e;
+            font-weight: 600;
+            line-height: 1.5;
+            border: 3px solid #3f51b5;
+            font-size: 1.1rem;
+        }
+
+        .finish-badge {
+            background: linear-gradient(135deg, #4caf50, #8bc34a);
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            font-weight: bold;
+            margin-top: 1rem;
+            display: inline-block;
+            border: 2px solid #2e7d32;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <span class="emoji">🏠🎗️</span>
+        <h2>Рушник громади (мир удома)</h2>
+        <div class="finish-badge">🏆 ФІНІШ!</div>
+        <p class="description">вишитий рушник із переплетеним орнаментом, поруч невеликий прапорець і силует школи</p>
+        <div class="hint">
+            Вітаємо! Ви пройшли Алею миру. Поверніться до старту/вчителя за підсумковою наліпкою/штампом.
+        </div>
+    </div>
+</body>
+
+</html>
