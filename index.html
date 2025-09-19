@@ -14,40 +14,26 @@
 
     <!-- Custom Tailwind Configuration -->
     <script>
-        tailwind.c            // Валідно: позначаємо відвіданою й готуємо підказку до наступної
-        visited.add(stationId);
-        saveVisited(visited);
-        currentIndex = Math.min(currentIndex + 1, route.length);
-        saveIndex(currentIndex);
-
-        waitingForHintForId = stationId; // щойно сканована правильна
-        updateUI();
-        setMsg(`Чудово! Станція ${stationId} зарахована.`, 'ok');
-
-        // Зупиняємо сканер
-        stopScanner();
-
-        // Автоматично показуємо підказку
-        const nextId = route[currentIndex] ?? null;
-        showHintModal(nextId); theme: {
-            extend: {
-                colors: {
-                    primary: '#6366f1',
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366f1',
                         secondary: '#06b6d4',
-                            success: '#10b981',
-                                warning: '#f59e0b',
-                                    danger: '#ef4444',
+                        success: '#10b981',
+                        warning: '#f59e0b',
+                        danger: '#ef4444'
                     },
-                fontFamily: {
-                    sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif']
                     },
-                animation: {
-                    'pulse-soft': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-                        'bounce-soft': 'bounce 1s infinite',
+                    animation: {
+                        'pulse-soft': 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'bounce-soft': 'bounce 1s infinite'
                     }
+                }
             }
-        }
-        }
+        };
     </script>
 
 
@@ -499,10 +485,14 @@
 
             waitingForHintForId = stationId; // щойно сканована правильна
             updateUI();
-            setMsg(`Чудово! Станція ${stationId} зарахована. Натисніть “Отримати підказку”.`, 'ok');
+            setMsg(`Чудово! Станція ${stationId} зарахована.`, 'ok');
 
-            // Зупиняємо сканер, щоб не ловити повтори, поки показуємо підказку
+            // Зупиняємо сканер, щоб не ловити повтори під час показу підказки
             stopScanner();
+
+            // Автоматично показуємо підказку до наступної станції
+            const nextId = route[currentIndex] ?? null;
+            showHintModal(nextId);
         }
 
         // ===== Дії кнопок =====
