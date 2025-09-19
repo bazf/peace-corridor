@@ -335,9 +335,9 @@
             if (!html5QrCode || scannerRunning) return;
             const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1.0 };
             try {
-                // Use front-facing camera (user-facing)
+                // Use rear-facing camera (environment-facing) for scanning QR codes on posters
                 await html5QrCode.start(
-                    { facingMode: "user" },
+                    { facingMode: "environment" },
                     config,
                     onScanSuccess,
                     onScanFailure
