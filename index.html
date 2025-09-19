@@ -471,6 +471,13 @@
             // Перевіряємо очікувану станцію
             if (scannedId !== expectedId) {
                 if (visited.has(scannedId)) {
+                    // Якщо це остання успішна станція - показуємо знову підказку
+                    if (scannedId === waitingForHintForId) {
+                        setMsg(`Підказка для наступної станції ${expectedId}.`, 'ok');
+                        stopScanner();
+                        showHintModal(scannedId);
+                        return;
+                    }
                     setMsg(`Станція ${scannedId} вже була. Зараз шукайте ${expectedId}.`, 'warn');
                 } else {
                     setMsg(`Це не та станція. Потрібна ${expectedId}.`, 'warn');
@@ -521,13 +528,13 @@
 
         btnCloseModal.addEventListener('click', () => {
             hideHintModal();
-            waitingForHintForId = null;
+            // НЕ очищаємо waitingForHintForId - залишаємо можливість пересканувати останню станцію
             updateUI();
         });
 
         btnContinueScanning.addEventListener('click', () => {
             hideHintModal();
-            waitingForHintForId = null;
+            // НЕ очищаємо waitingForHintForId - залишаємо можливість пересканувати останню станцію
             updateUI();
             startScanner();
         });
@@ -536,7 +543,7 @@
         hintModal.addEventListener('click', (e) => {
             if (e.target === hintModal) {
                 hideHintModal();
-                waitingForHintForId = null;
+                // НЕ очищаємо waitingForHintForId - залишаємо можливість пересканувати останню станцію
                 updateUI();
             }
         });
