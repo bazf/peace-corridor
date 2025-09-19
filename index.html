@@ -466,9 +466,12 @@
             // Перевіряємо, чи це очікувана наступна зупинка
             const expectedId = route[currentIndex] ?? null;
             if (stationId !== expectedId) {
-                // вже відмічена? (щоб повідомлення було дружнє)
                 if (visited.has(stationId)) {
-                    setMsg(`Станція ${stationId} вже пройдена. Знайдіть вашу поточну: станцію ${expectedId}.`, 'warn');
+                    // Користувач повторно просканував вже пройдену станцію → просто знову показуємо поточну підказку
+                    const nextId = expectedId; // може бути null (завершення маршруту)
+                    stopScanner();
+                    showHintModal(nextId);
+                    setMsg('', ''); // без повідомлення
                 } else {
                     setMsg(`Це не ваша наступна станція. Зараз вам потрібна станція ${expectedId}.`, 'warn');
                 }
